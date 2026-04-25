@@ -539,18 +539,26 @@
   padding: 6px 10px;
   outline: none;
   width: 100%;
-  opacity: .5;
-  cursor: not-allowed;
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
+.setting-select:focus,
+.setting-textarea:focus,
+.setting-number:focus {
+  border-color: var(--green);
+  box-shadow: var(--focus-ring);
+}
+.setting-select:disabled,
+.setting-textarea:disabled,
+.setting-number:disabled { opacity: .5; cursor: not-allowed; }
 .setting-textarea { resize: none; }
 .setting-number   { width: 70px; }
 
 .setting-slider {
   width: 100%;
-  opacity: .4;
-  cursor: not-allowed;
   accent-color: var(--green);
+  cursor: pointer;
 }
+.setting-slider:disabled { opacity: .4; cursor: not-allowed; }
 
 .setting-soon {
   font-size: 10px;
@@ -609,4 +617,197 @@
 .toggle-switch input:checked ~ .toggle-track .toggle-thumb {
   transform: translate(16px, -50%);
   background: var(--green);
+}
+
+/* Save button */
+.btn-save {
+  align-self: flex-end;
+  background: var(--green);
+  border: none;
+  border-radius: var(--r);
+  color: #fff;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.btn-save:hover { background: var(--green-hover); }
+
+/* ============================================================
+   Assistant message bubble (mirrors system style)
+   ============================================================ */
+.message--assistant { align-self: flex-start; }
+.message--assistant .message-bubble {
+  background: var(--sys-bg);
+  border: 1px solid var(--sys-brd);
+  border-radius: var(--r-bubble) var(--r-bubble) var(--r-bubble) 4px;
+}
+
+/* ============================================================
+   API Key Verification Overlay
+   ============================================================ */
+.api-overlay {
+  width: 100vw;
+  height: 100vh;
+  background: var(--bg-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font);
+  color: var(--text-pri);
+}
+
+.api-overlay-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-lt);
+  border-radius: var(--r-lg);
+  padding: 40px 44px;
+  max-width: 480px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.api-overlay-card h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-pri);
+  margin: 0;
+}
+
+.api-overlay-card > p {
+  font-size: 14px;
+  color: var(--text-sec);
+  line-height: 1.6;
+  margin: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.api-spinner {
+  width: 42px;
+  height: 42px;
+  border: 3px solid var(--border-lt);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+.api-error-icon { font-size: 38px; color: var(--danger); }
+
+.api-key-reading {
+  font-size: 12px;
+  color: var(--text-sec);
+  margin: 0;
+}
+.api-key-reading code {
+  background: var(--bg-input);
+  border: 1px solid var(--border-lt);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 12px;
+  color: var(--gold-lt);
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+
+.api-error-msg {
+  font-size: 13px;
+  color: var(--danger);
+  background: var(--danger-bg);
+  padding: 9px 16px;
+  border-radius: var(--r);
+  width: 100%;
+  margin: 0;
+  word-break: break-all;
+}
+
+.api-error-hint {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px 20px;
+  text-align: left;
+  width: 100%;
+}
+
+.api-error-hint > p {
+  font-size: 12px;
+  color: var(--text-sec);
+  margin: 0 0 10px;
+}
+
+.api-error-hint ol {
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+}
+
+.api-error-hint li {
+  font-size: 12px;
+  color: var(--text-sec);
+  line-height: 1.6;
+}
+
+.api-error-hint code {
+  background: var(--bg-input);
+  border: 1px solid var(--border-lt);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+  color: var(--gold-lt);
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+
+.btn-retry {
+  background: var(--green);
+  border: none;
+  border-radius: var(--r);
+  color: #fff;
+  padding: 9px 24px;
+  font-size: 13px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.btn-retry:hover { background: var(--green-hover); }
+
+/* ============================================================
+   Toast Notifications
+   ============================================================ */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.toast {
+  background: var(--bg-elevated);
+  border: 1px solid var(--green);
+  border-radius: var(--r);
+  padding: 10px 18px;
+  font-size: 13px;
+  color: var(--text-pri);
+  box-shadow: var(--shadow-sm);
+  animation: toastIn .2s ease;
+  white-space: nowrap;
+  font-family: var(--font);
 }

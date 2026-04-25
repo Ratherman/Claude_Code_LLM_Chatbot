@@ -1,5 +1,11 @@
 import { useState } from 'react'
 
+const MODELS = [
+  { value: 'gpt-4o',        label: 'GPT-4o' },
+  { value: 'gpt-5.4',       label: 'GPT-5.4' },
+  { value: 'gpt-5.4-mini',  label: 'GPT-5.4 mini' },
+]
+
 const TOGGLES = [
   { key: 'rag',          label: 'RAG 知識庫檢索' },
   { key: 'skill',        label: 'SKILL 技能加載' },
@@ -8,8 +14,9 @@ const TOGGLES = [
   { key: 'tokenLog',     label: 'Token 與模型記錄' },
 ]
 
-export default function RightPanel({ collapsed, onToggleCollapse }) {
-  const [temperature, setTemperature] = useState(1.0)
+export default function RightPanel({ collapsed, onToggleCollapse, settings, onModelChange, onTemperatureChange, onSystemPromptSave }) {
+  const [tempValue, setTempValue] = useState(settings?.temperature ?? 1.0)
+  const [promptValue, setPromptValue] = useState(settings?.systemPrompt ?? '')
 
   if (collapsed) {
     return (
@@ -30,38 +37,41 @@ export default function RightPanel({ collapsed, onToggleCollapse }) {
 
         <div className="setting-group">
           <label className="setting-label">切換模型</label>
-          <select className="setting-select" disabled>
-            <option>GPT-4o</option>
-            <option>GPT-4o mini</option>
-            <option>GPT-3.5 Turbo</option>
+          <select
+            className="setting-select"
+            value={settings?.model ?? 'gpt-4o'}
+            onChange={e => onModelChange(e.target.value)}
+          >
+            {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
-          <span className="setting-soon">即將開放</span>
         </div>
 
         <div className="setting-group">
           <div className="setting-row">
             <label className="setting-label">溫度值</label>
-            <span className="setting-value">{temperature.toFixed(1)}</span>
+            <span className="setting-value">{tempValue.toFixed(1)}</span>
           </div>
           <input
-            type="range" min="0" max="2" step="0.1"
-            value={temperature}
-            onChange={e => setTemperature(parseFloat(e.target.value))}
+            type="range" min="0" max="1" step="0.1"
+            value={tempValue}
+            onChange={e => setTempValue(parseFloat(e.target.value))}
+            onPointerUp={e => onTemperatureChange(parseFloat(e.target.value))}
             className="setting-slider"
-            disabled
           />
-          <span className="setting-soon">即將開放</span>
         </div>
 
         <div className="setting-group">
           <label className="setting-label">系統提示詞</label>
           <textarea
             className="setting-textarea"
+            value={promptValue}
+            onChange={e => setPromptValue(e.target.value)}
             placeholder="輸入 System Prompt…"
             rows={4}
-            disabled
           />
-          <span className="setting-soon">即將開放</span>
+          <button className="btn-save" onClick={() => onSystemPromptSave(promptValue)}>
+            儲存
+          </button>
         </div>
 
         <div className="setting-group">
