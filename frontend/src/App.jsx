@@ -12,6 +12,7 @@ const FEATURE_LABELS = {
   ragEnabled:          'RAG 知識庫檢索',
   skillEnabled:        'SKILL 技能加載',
   functionCallEnabled: 'Function Call 上網查詢',
+  guardrail:           'NeMo Guardrail 安全防護',
 }
 
 const FEATURE_REQUIRED = {
@@ -41,6 +42,7 @@ export default function App() {
     ragEnabled: false,
     skillEnabled: false,
     functionCallEnabled: false,
+    guardrail: false,
   })
   const [toasts, setToasts] = useState([])
   const [retryCount, setRetryCount] = useState(0)
@@ -97,6 +99,7 @@ export default function App() {
           temperature: settings.temperature,
           systemPrompt: settings.systemPrompt,
           mode,
+          guardrail: settings.guardrail,
         })
       })
       const data = await res.json()

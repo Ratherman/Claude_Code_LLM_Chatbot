@@ -1,0 +1,21 @@
+# NeMo Guardrails — Colang 流程定義
+# 此檔案定義 input / output rail 的觸發邏輯與攔截回覆。
+# 實際判斷標準請至 prompts.yml 修改。
+
+# ── Input Rail ────────────────────────────────────────────────────────────────
+define flow self check input
+  $allowed = execute self_check_input
+  if not $allowed
+    bot refuse to respond
+
+define bot refuse to respond
+  "很抱歉，您的訊息未通過安全檢查，無法處理此請求。請重新描述您的問題，或聯繫系統管理員。"
+
+# ── Output Rail ───────────────────────────────────────────────────────────────
+define flow self check output
+  $allowed = execute self_check_output
+  if not $allowed
+    bot respond with filtered message
+
+define bot respond with filtered message
+  "抱歉，系統偵測到回覆可能包含不適當內容，已攔截此回覆。請重新提問或換個方式描述需求。"

@@ -13,8 +13,7 @@ const FEATURE_TOGGLES = [
 ]
 
 const DISABLED_TOGGLES = [
-  { key: 'guardrail', label: 'NeMo Guardrail 安全防護' },
-  { key: 'tokenLog',  label: 'Token 與模型記錄' },
+  { key: 'tokenLog', label: 'Token 與模型記錄' },
 ]
 
 export default function RightPanel({
@@ -147,6 +146,24 @@ export default function RightPanel({
             </label>
           </div>
         ))}
+
+        <div className="setting-divider" />
+
+        {/* Guardrail — independent of context router */}
+        <div className="setting-toggle">
+          <div className="toggle-label-group">
+            <span className="toggle-label">NeMo Guardrail 安全防護</span>
+            <span className="toggle-sublabel">檢查輸入是否有 Prompt Injection，並過濾不當回覆</span>
+          </div>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={!!settings?.guardrail}
+              onChange={e => onToggleChange('guardrail', e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
+        </div>
 
         <div className="setting-divider" />
 

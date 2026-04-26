@@ -1,0 +1,18 @@
+# NeMo Guardrails — 主設定檔
+# 此檔案遵循 NeMo Guardrails 官方格式。
+# 若日後要升級至完整 NeMo Guardrails 套件，直接 pip install nemoguardrails
+# 並在 app.py 改用 RailsConfig.from_path() 即可。
+
+models:
+  - type: main
+    engine: openai
+    model: gpt-4o-mini       # 安全檢查使用輕量模型，不影響主對話品質
+
+rails:
+  input:
+    flows:
+      - self check input     # 判斷使用者輸入是否安全
+
+  output:
+    flows:
+      - self check output    # 判斷 AI 回覆是否符合內容政策
