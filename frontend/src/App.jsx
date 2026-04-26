@@ -6,6 +6,20 @@ import './App.css'
 
 const API_BASE = 'http://localhost:5000'
 
+const FEATURE_LABELS = {
+  contextRouter:       'Context Router 分流',
+  autoRoute:           '自動分流模式',
+  ragEnabled:          'RAG 知識庫檢索',
+  skillEnabled:        'SKILL 技能加載',
+  functionCallEnabled: 'Function Call 上網查詢',
+}
+
+const FEATURE_REQUIRED = {
+  rag:           'ragEnabled',
+  skill:         'skillEnabled',
+  function_call: 'functionCallEnabled',
+}
+
 export default function App() {
   const [chats, setChats] = useState([{ id: 1, name: '新對話' }])
   const [activeChatId, setActiveChatId] = useState(1)
@@ -17,10 +31,21 @@ export default function App() {
   const [apiStatus, setApiStatus] = useState('checking')
   const [apiError, setApiError] = useState('')
   const [maskedKey, setMaskedKey] = useState('')
-  const [settings, setSettings] = useState({ model: 'gpt-4o', temperature: 1.0, systemPrompt: '', memoryCount: 5 })
+  const [settings, setSettings] = useState({
+    model: 'gpt-4o',
+    temperature: 1.0,
+    systemPrompt: '',
+    memoryCount: 5,
+    contextRouter: false,
+    autoRoute: false,
+    ragEnabled: false,
+    skillEnabled: false,
+    functionCallEnabled: false,
+  })
   const [toasts, setToasts] = useState([])
   const [retryCount, setRetryCount] = useState(0)
   const nextId = useRef(2)
+  const pendingHistoryRef = useRef({})
 
   useEffect(() => {
     setApiStatus('checking')
@@ -60,49 +85,169 @@ export default function App() {
 
   const renameChat = (id, name) => setChats(prev => prev.map(c => c.id === id ? { ...c, name } : c))
 
-  const sendMessage = async (text, image = null) => {
-    if (!activeChatId) return
-    const ts = Date.now()
-    const userMsg = { id: ts, role: 'user', text, ...(image && { image }) }
-
-    setMessages(prev => ({
-      ...prev,
-      [activeChatId]: [...(prev[activeChatId] || []), userMsg]
-    }))
-
-    const chat = chats.find(c => c.id === activeChatId)
-    if (chat?.name === '新對話') renameChat(activeChatId, text.slice(0, 16))
-
-    setIsTyping(prev => ({ ...prev, [activeChatId]: true }))
-
-    const prevHistory = messages[activeChatId] || []
-    const recentPrev = settings.memoryCount > 0
-      ? prevHistory.slice(-(settings.memoryCount * 2))
-      : []
-    const historyToSend = [...recentPrev, userMsg]
-
+  // ── Core chat API call ──────────────────────────────────────────────────────
+  const callChat = async (history, mode, chatId) => {
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: historyToSend.map(m => ({ role: m.role, text: m.text, ...(m.image && { image: m.image }) })),
+          messages: history.map(m => ({ role: m.role, text: m.text, ...(m.image && { image: m.image }) })),
           model: settings.model,
           temperature: settings.temperature,
           systemPrompt: settings.systemPrompt,
+          mode,
         })
       })
       const data = await res.json()
       const reply = { id: Date.now(), role: 'assistant', text: data.error ? `錯誤：${data.error}` : data.text }
-      setMessages(prev => ({ ...prev, [activeChatId]: [...(prev[activeChatId] || []), reply] }))
+      setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), reply] }))
     } catch {
       const errMsg = { id: Date.now(), role: 'assistant', text: '無法連接到伺服器，請確認後端是否正在運行。' }
-      setMessages(prev => ({ ...prev, [activeChatId]: [...(prev[activeChatId] || []), errMsg] }))
+      setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), errMsg] }))
     } finally {
-      setIsTyping(prev => ({ ...prev, [activeChatId]: false }))
+      setIsTyping(prev => ({ ...prev, [chatId]: false }))
     }
   }
 
+  // ── Auto-confirm helper (used when autoRoute is on) ────────────────────────
+  const _autoConfirm = async (routerId, mode, reason, chatId) => {
+    setMessages(prev => ({
+      ...prev,
+      [chatId]: prev[chatId].map(m =>
+        m.id === routerId
+          ? { ...m, status: 'confirmed', suggestedMode: mode, confirmedMode: mode, reason }
+          : m
+      )
+    }))
+    const featureKey = FEATURE_REQUIRED[mode]
+    if (featureKey && !settings[featureKey]) {
+      const errMsg = { id: Date.now(), role: 'assistant', text: `請先在右側面板開啟「${FEATURE_LABELS[featureKey]}」功能。` }
+      setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), errMsg] }))
+      return
+    }
+    setIsTyping(prev => ({ ...prev, [chatId]: true }))
+    const history = pendingHistoryRef.current[routerId] || []
+    delete pendingHistoryRef.current[routerId]
+    await callChat(history, mode, chatId)
+  }
+
+  // ── Send message ────────────────────────────────────────────────────────────
+  const sendMessage = async (text, image = null) => {
+    if (!activeChatId) return
+    const chatId = activeChatId
+    const ts = Date.now()
+    const userMsg = { id: ts, role: 'user', text, ...(image && { image }) }
+
+    const prevHistory = messages[chatId] || []
+    const recentPrev = settings.memoryCount > 0 ? prevHistory.slice(-(settings.memoryCount * 2)) : []
+    const historyToSend = [...recentPrev, userMsg]
+
+    const chat = chats.find(c => c.id === chatId)
+    if (chat?.name === '新對話') renameChat(chatId, text.slice(0, 16))
+
+    if (settings.contextRouter) {
+      // ── Router flow ──
+      const routerId = ts + 1
+      const routerMsg = { id: routerId, role: 'router', status: 'routing', suggestedMode: null, selectedMode: null, reason: '' }
+      setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), userMsg, routerMsg] }))
+      pendingHistoryRef.current[routerId] = historyToSend
+
+      try {
+        const res = await fetch(`${API_BASE}/api/route`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: historyToSend.map(m => ({ role: m.role, text: m.text, ...(m.image && { image: m.image }) })) })
+        })
+        const data = await res.json()
+        if (settings.autoRoute) {
+          await _autoConfirm(routerId, data.mode, data.reason, chatId)
+        } else {
+          setMessages(prev => ({
+            ...prev,
+            [chatId]: prev[chatId].map(m =>
+              m.id === routerId
+                ? { ...m, status: 'pending', suggestedMode: data.mode, selectedMode: data.mode, reason: data.reason }
+                : m
+            )
+          }))
+        }
+      } catch {
+        if (settings.autoRoute) {
+          await _autoConfirm(routerId, 'chat', '分流服務暫時不可用', chatId)
+        } else {
+          setMessages(prev => ({
+            ...prev,
+            [chatId]: prev[chatId].map(m =>
+              m.id === routerId
+                ? { ...m, status: 'pending', suggestedMode: 'chat', selectedMode: 'chat', reason: '分流服務暫時不可用' }
+                : m
+            )
+          }))
+        }
+      }
+    } else {
+      // ── Direct chat flow ──
+      setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), userMsg] }))
+      setIsTyping(prev => ({ ...prev, [chatId]: true }))
+      await callChat(historyToSend, 'chat', chatId)
+    }
+  }
+
+  // ── Router: user selects a different mode ───────────────────────────────────
+  const updateRouterMode = (routerId, mode) => {
+    setMessages(prev => ({
+      ...prev,
+      [activeChatId]: prev[activeChatId].map(m =>
+        m.id === routerId ? { ...m, selectedMode: mode } : m
+      )
+    }))
+  }
+
+  // ── Router: user confirms mode ──────────────────────────────────────────────
+  const confirmRoute = async (routerId, mode) => {
+    const chatId = activeChatId
+
+    setMessages(prev => ({
+      ...prev,
+      [chatId]: prev[chatId].map(m =>
+        m.id === routerId ? { ...m, status: 'confirmed', confirmedMode: mode } : m
+      )
+    }))
+
+    // Check if required feature is enabled
+    const featureKey = FEATURE_REQUIRED[mode]
+    if (featureKey && !settings[featureKey]) {
+      const errMsg = {
+        id: Date.now(), role: 'assistant',
+        text: `請先在右側面板開啟「${FEATURE_LABELS[featureKey]}」功能。`,
+      }
+      setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), errMsg] }))
+      return
+    }
+
+    setIsTyping(prev => ({ ...prev, [chatId]: true }))
+    const history = pendingHistoryRef.current[routerId] || []
+    delete pendingHistoryRef.current[routerId]
+    await callChat(history, mode, chatId)
+  }
+
+  // ── Toggle settings (contextRouter + sub-features) ──────────────────────────
+  const handleToggleChange = (key, value) => {
+    setSettings(s => {
+      const next = { ...s, [key]: value }
+      if (key === 'contextRouter' && !value) {
+        next.autoRoute = false
+        next.ragEnabled = false
+        next.skillEnabled = false
+        next.functionCallEnabled = false
+      }
+      return next
+    })
+    showToast(value ? `已開啟 ${FEATURE_LABELS[key]}` : `已關閉 ${FEATURE_LABELS[key]}`)
+  }
+
+  // ── Verification screens ────────────────────────────────────────────────────
   if (apiStatus === 'checking') {
     return (
       <div className="api-overlay">
@@ -120,9 +265,7 @@ export default function App() {
         <div className="api-overlay-card api-overlay-card--error">
           <div className="api-error-icon">⚠</div>
           <h2>無法啟動</h2>
-          {maskedKey && (
-            <p className="api-key-reading">後端讀到的 Key：<code>{maskedKey}</code></p>
-          )}
+          {maskedKey && <p className="api-key-reading">後端讀到的 Key：<code>{maskedKey}</code></p>}
           <p className="api-error-msg">{apiError}</p>
           <div className="api-error-hint">
             <p>請確認以下步驟：</p>
@@ -158,6 +301,8 @@ export default function App() {
         onSendMessage={sendMessage}
         active={!!activeChatId}
         isTyping={!!isTyping[activeChatId]}
+        onUpdateRouterMode={updateRouterMode}
+        onConfirmRoute={confirmRoute}
       />
       <RightPanel
         collapsed={rightCollapsed}
@@ -167,6 +312,7 @@ export default function App() {
         onTemperatureChange={temperature => { setSettings(s => ({ ...s, temperature })); showToast(`溫度值已設為 ${temperature.toFixed(1)}`) }}
         onSystemPromptSave={systemPrompt => { setSettings(s => ({ ...s, systemPrompt })); showToast('系統提示詞已儲存') }}
         onMemoryChange={memoryCount => { setSettings(s => ({ ...s, memoryCount })); showToast(`對話記憶設為 ${memoryCount} 輪`) }}
+        onToggleChange={handleToggleChange}
       />
       <div className="toast-container">
         {toasts.map(t => <div key={t.id} className="toast">{t.msg}</div>)}

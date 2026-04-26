@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 
-export default function ChatPanel({ messages, onSendMessage, active, isTyping }) {
+const MODE_CONFIG = [
+  { key: 'chat',          label: '一般聊天',     icon: '💬' },
+  { key: 'rag',           label: 'MIS 相關問題',  icon: '🗃' },
+  { key: 'skill',         label: '發票辨識',      icon: '🧾' },
+  { key: 'function_call', label: '上網找資料',    icon: '🌐' },
+]
+
+export default function ChatPanel({ messages, onSendMessage, active, isTyping, onUpdateRouterMode, onConfirmRoute }) {
   const [input, setInput] = useState('')
   const [pendingImage, setPendingImage] = useState(null)
   const [lightboxSrc, setLightboxSrc] = useState(null)
@@ -57,21 +64,74 @@ export default function ChatPanel({ messages, onSendMessage, active, isTyping })
           </div>
         ) : (
           <>
-            {messages.map(msg => (
-              <div key={msg.id} className={`message message--${msg.role}`}>
-                <div className="message-bubble">
-                  {msg.image && (
-                    <img
-                      src={msg.image}
-                      className="message-img"
-                      onClick={() => setLightboxSrc(msg.image)}
-                      alt="uploaded"
-                    />
-                  )}
-                  {msg.text && <p>{msg.text}</p>}
+            {messages.map(msg => {
+              if (msg.role === 'router') {
+                return (
+                  <div key={msg.id} className="router-card">
+                    {msg.status === 'routing' && (
+                      <div className="router-loading">
+                        <div className="router-spinner" />
+                        <span>AI 正在分析訊息…</span>
+                      </div>
+                    )}
+
+                    {msg.status === 'pending' && (
+                      <>
+                        <div className="router-header">
+                          <span className="router-label">AI 判斷分流</span>
+                          {msg.reason && <span className="router-reason">{msg.reason}</span>}
+                        </div>
+                        <div className="router-modes">
+                          {MODE_CONFIG.map(m => (
+                            <button
+                              key={m.key}
+                              className={`router-mode-btn${msg.selectedMode === m.key ? ' router-mode-btn--selected' : ''}`}
+                              onClick={() => onUpdateRouterMode(msg.id, m.key)}
+                            >
+                              <span className="router-mode-icon">{m.icon}</span>
+                              <span className="router-mode-label">{m.label}</span>
+                              {msg.suggestedMode === m.key && <span className="router-ai-tag">AI</span>}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          className="router-confirm-btn"
+                          onClick={() => onConfirmRoute(msg.id, msg.selectedMode)}
+                        >
+                          確認並送出
+                        </button>
+                      </>
+                    )}
+
+                    {msg.status === 'confirmed' && (() => {
+                      const m = MODE_CONFIG.find(m => m.key === msg.confirmedMode)
+                      return m ? (
+                        <div className="router-confirmed">
+                          {m.icon} 已使用：{m.label}
+                        </div>
+                      ) : null
+                    })()}
+                  </div>
+                )
+              }
+
+              return (
+                <div key={msg.id} className={`message message--${msg.role}`}>
+                  <div className="message-bubble">
+                    {msg.image && (
+                      <img
+                        src={msg.image}
+                        className="message-img"
+                        onClick={() => setLightboxSrc(msg.image)}
+                        alt="uploaded"
+                      />
+                    )}
+                    {msg.text && <p>{msg.text}</p>}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
+
             {isTyping && (
               <div className="message message--system">
                 <div className="message-bubble typing-indicator">
@@ -120,12 +180,7 @@ export default function ChatPanel({ messages, onSendMessage, active, isTyping })
           />
         </div>
 
-        <button
-          className="btn-send"
-          onClick={handleSend}
-          disabled={!canSend}
-          title="送出"
-        >↑</button>
+        <button className="btn-send" onClick={handleSend} disabled={!canSend} title="送出">↑</button>
       </div>
 
       {lightboxSrc && (

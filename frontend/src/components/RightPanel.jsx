@@ -6,15 +6,21 @@ const MODELS = [
   { value: 'gpt-5.4-mini',  label: 'GPT-5.4 mini' },
 ]
 
-const TOGGLES = [
-  { key: 'rag',          label: 'RAG 知識庫檢索' },
-  { key: 'skill',        label: 'SKILL 技能加載' },
-  { key: 'functionCall', label: 'Function Call 上網查詢' },
-  { key: 'guardrail',    label: 'NeMo Guardrail 安全防護' },
-  { key: 'tokenLog',     label: 'Token 與模型記錄' },
+const FEATURE_TOGGLES = [
+  { key: 'ragEnabled',          label: 'RAG 知識庫檢索' },
+  { key: 'skillEnabled',        label: 'SKILL 技能加載' },
+  { key: 'functionCallEnabled', label: 'Function Call 上網查詢' },
 ]
 
-export default function RightPanel({ collapsed, onToggleCollapse, settings, onModelChange, onTemperatureChange, onSystemPromptSave, onMemoryChange }) {
+const DISABLED_TOGGLES = [
+  { key: 'guardrail', label: 'NeMo Guardrail 安全防護' },
+  { key: 'tokenLog',  label: 'Token 與模型記錄' },
+]
+
+export default function RightPanel({
+  collapsed, onToggleCollapse,
+  settings, onModelChange, onTemperatureChange, onSystemPromptSave, onMemoryChange, onToggleChange
+}) {
   const [tempValue, setTempValue] = useState(settings?.temperature ?? 1.0)
   const [promptValue, setPromptValue] = useState(settings?.systemPrompt ?? '')
   const [memoryValue, setMemoryValue] = useState(settings?.memoryCount ?? 5)
@@ -26,6 +32,8 @@ export default function RightPanel({ collapsed, onToggleCollapse, settings, onMo
       </aside>
     )
   }
+
+  const routerOn = !!settings?.contextRouter
 
   return (
     <aside className="right-panel">
@@ -70,9 +78,7 @@ export default function RightPanel({ collapsed, onToggleCollapse, settings, onMo
             placeholder="輸入 System Prompt…"
             rows={4}
           />
-          <button className="btn-save" onClick={() => onSystemPromptSave(promptValue)}>
-            儲存
-          </button>
+          <button className="btn-save" onClick={() => onSystemPromptSave(promptValue)}>儲存</button>
         </div>
 
         <div className="setting-group">
@@ -91,8 +97,62 @@ export default function RightPanel({ collapsed, onToggleCollapse, settings, onMo
 
         <div className="setting-divider" />
 
-        {TOGGLES.map(t => (
-          <div key={t.key} className="setting-toggle">
+        {/* Context Router — master switch */}
+        <div className="setting-toggle">
+          <div className="toggle-label-group">
+            <span className="toggle-label">Context Router 分流</span>
+            <span className="toggle-sublabel">啟用後才可使用下方功能</span>
+          </div>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={routerOn}
+              onChange={e => onToggleChange('contextRouter', e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
+        </div>
+
+        {/* Auto Mode — dim when router is off */}
+        <div className={`setting-toggle${!routerOn ? ' setting-toggle--dim' : ''}`}>
+          <div className="toggle-label-group">
+            <span className="toggle-label">自動分流模式</span>
+            <span className="toggle-sublabel">AI 判斷後直接送出，不等確認</span>
+          </div>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={!!settings?.autoRoute}
+              disabled={!routerOn}
+              onChange={e => onToggleChange('autoRoute', e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
+        </div>
+
+        <div className="setting-divider" />
+
+        {/* Sub-features — dim when router is off */}
+        {FEATURE_TOGGLES.map(t => (
+          <div key={t.key} className={`setting-toggle${!routerOn ? ' setting-toggle--dim' : ''}`}>
+            <span className="toggle-label">{t.label}</span>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={!!settings?.[t.key]}
+                disabled={!routerOn}
+                onChange={e => onToggleChange(t.key, e.target.checked)}
+              />
+              <span className="toggle-track"><span className="toggle-thumb" /></span>
+            </label>
+          </div>
+        ))}
+
+        <div className="setting-divider" />
+
+        {/* Still disabled */}
+        {DISABLED_TOGGLES.map(t => (
+          <div key={t.key} className="setting-toggle setting-toggle--dim">
             <span className="toggle-label">{t.label}</span>
             <label className="toggle-switch">
               <input type="checkbox" disabled />
