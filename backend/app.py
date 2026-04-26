@@ -7,6 +7,7 @@ from typing import Literal
 import pathlib
 import os
 import json
+import numpy as np
 
 load_dotenv(pathlib.Path(__file__).parent.parent / '.env', override=True)
 
@@ -15,6 +16,8 @@ CORS(app)
 
 api_key = os.getenv('OPENAI_API_KEY')
 client = OpenAI(api_key=api_key) if api_key else None
+
+_BASE = pathlib.Path(__file__).parent
 
 
 # ── Pydantic schema for Context Router output ──────────────────────────────────
@@ -28,12 +31,39 @@ ROUTER_SYSTEM_PROMPT = """你是一個智慧對話分流器。根據對話脈絡
 
 ## 四種模式定義
 - chat        : 一般聊天、問候、閒聊、通用知識問答、不屬於其他三類的問題
-- rag         : MIS 相關問題，例如：系統操作說明、IT 設定、公司內部規定、ERP/HR 系統、設備管理
+- rag         : MIS／IT 支援相關問題，例如：忘記密碼（Windows/Email/ERP/VPN）、電腦開不起來或速度慢、藍色死亡畫面（BSOD）、程式當機、螢幕閃爍或顯示異常、雙螢幕設定、Gmail 收發信件或附件問題、網路無法連線、Wi-Fi 問題、印表機無法列印、軟體安裝申請、資料誤刪救援等 IT 支援問題
 - skill       : 發票辨識，例如：使用者上傳發票圖片、要求讀取或解析發票、統編查詢
 - function_call: 需要即時網路資料，例如：今日天氣、最新新聞、即時股價、近期發生的事件
 
 ## 輸出格式（嚴格遵守，只輸出此 JSON）
 {"mode": "<chat|rag|skill|function_call>", "reason": "<判斷原因，一句話，不超過 30 字>"}"""
+
+
+# ── RAG: load QA data and embeddings on startup ────────────────────────────────
+QA_DATA = []
+QA_EMBEDDINGS = None
+
+
+def _load_rag_data():
+    global QA_DATA, QA_EMBEDDINGS
+    qa_path = _BASE / 'data' / 'qa.json'
+    emb_path = _BASE / 'embeddings' / 'qa_embeddings.npy'
+    if qa_path.exists():
+        with open(qa_path, encoding='utf-8') as f:
+            QA_DATA = json.load(f)
+    if emb_path.exists():
+        QA_EMBEDDINGS = np.load(str(emb_path))
+
+
+_load_rag_data()
+
+
+def _rag_search(query_embedding, top_k=3):
+    query_vec = np.array(query_embedding, dtype=np.float32)
+    norms = np.linalg.norm(QA_EMBEDDINGS, axis=1) * np.linalg.norm(query_vec)
+    similarities = QA_EMBEDDINGS @ query_vec / np.maximum(norms, 1e-10)
+    top_indices = np.argsort(similarities)[::-1][:top_k]
+    return [QA_DATA[i] for i in top_indices]
 
 
 def _mask_key(key):
@@ -118,15 +148,55 @@ def chat():
     system_prompt = data.get('systemPrompt', '').strip()
     mode = data.get('mode', 'chat')
 
-    # Placeholder responses for unimplemented pipeline modes
+    # ── RAG mode ──────────────────────────────────────────────────────────────
+    if mode == 'rag':
+        if QA_EMBEDDINGS is None:
+            return jsonify({'text': '（RAG）知識庫向量尚未建立，請先執行：python backend/generate_embeddings.py'})
+
+        user_messages = [m for m in messages if m.get('role') == 'user']
+        query_text = user_messages[-1].get('text', '') if user_messages else ''
+        if not query_text:
+            return jsonify({'text': '未收到使用者問題'})
+
+        try:
+            emb_response = client.embeddings.create(
+                model='text-embedding-3-small',
+                input=query_text,
+            )
+            query_embedding = emb_response.data[0].embedding
+            relevant_qas = _rag_search(query_embedding, top_k=3)
+            context = '\n\n'.join(
+                f"Q: {qa['question']}\nA: {qa['answer']}" for qa in relevant_qas
+            )
+            rag_system = (
+                "你是公司的 MIS 支援助手。請根據以下知識庫資料回答使用者的問題。\n\n"
+                f"相關知識庫資料：\n{context}\n\n"
+                "請根據上述資料提供清楚、具體的解答。"
+                "若知識庫資料不足以完整回答，請說明建議直接聯繫 MIS 人員進一步協助。"
+            )
+            api_messages = [{'role': 'system', 'content': rag_system}]
+            api_messages.extend(
+                [{'role': m['role'], 'content': _build_content(m)} for m in messages]
+            )
+            response = client.chat.completions.create(
+                model=model,
+                messages=api_messages,
+                temperature=temperature,
+            )
+            refs = [{'id': qa['id'], 'question': qa['question']} for qa in relevant_qas]
+            return jsonify({'text': response.choices[0].message.content, 'refs': refs})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    # ── Placeholder responses for unimplemented pipeline modes ────────────────
     placeholders = {
-        'rag':           '（RAG）MIS 相關問題功能尚未實踐，敬請期待。',
         'skill':         '（Skill）發票辨識功能尚未實踐，敬請期待。',
         'function_call': '（Function Call）上網找資料功能尚未實踐，敬請期待。',
     }
     if mode in placeholders:
         return jsonify({'text': placeholders[mode]})
 
+    # ── General chat ──────────────────────────────────────────────────────────
     api_messages = []
     if system_prompt:
         api_messages.append({'role': 'system', 'content': system_prompt})

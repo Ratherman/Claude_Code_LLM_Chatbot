@@ -100,7 +100,11 @@ export default function App() {
         })
       })
       const data = await res.json()
-      const reply = { id: Date.now(), role: 'assistant', text: data.error ? `錯誤：${data.error}` : data.text }
+      const reply = {
+        id: Date.now(), role: 'assistant',
+        text: data.error ? `錯誤：${data.error}` : data.text,
+        ...(data.refs && { refs: data.refs }),
+      }
       setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), reply] }))
     } catch {
       const errMsg = { id: Date.now(), role: 'assistant', text: '無法連接到伺服器，請確認後端是否正在運行。' }
@@ -140,7 +144,8 @@ export default function App() {
     const userMsg = { id: ts, role: 'user', text, ...(image && { image }) }
 
     const prevHistory = messages[chatId] || []
-    const recentPrev = settings.memoryCount > 0 ? prevHistory.slice(-(settings.memoryCount * 2)) : []
+    const chatHistory = prevHistory.filter(m => m.role === 'user' || m.role === 'assistant')
+    const recentPrev = settings.memoryCount > 0 ? chatHistory.slice(-(settings.memoryCount * 2)) : []
     const historyToSend = [...recentPrev, userMsg]
 
     const chat = chats.find(c => c.id === chatId)

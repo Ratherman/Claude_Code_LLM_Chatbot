@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cat C:\\\\\\\\Users\\\\\\\\rathe\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\c--Users-rathe-Project-Claude-Code-LLM-Chatbot\\\\\\\\c4a1cf6e-55e9-4ef4-b2fd-7c1d1ed7ce63\\\\\\\\tasks\\\\\\\\b0123h0wp.output)"
+      "Bash(cat C:\\\\\\\\Users\\\\\\\\rathe\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\c--Users-rathe-Project-Claude-Code-LLM-Chatbot\\\\\\\\c4a1cf6e-55e9-4ef4-b2fd-7c1d1ed7ce63\\\\\\\\tasks\\\\\\\\b0123h0wp.output)",
+      "Bash(npm install *)"
     ]
   }
 }

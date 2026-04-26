@@ -16,6 +16,9 @@ node_modules/
 frontend/dist/
 frontend/.vite/
 
+# Generated embeddings (binary, rebuild with generate_embeddings.py)
+backend/embeddings/
+
 # Misc
 *.log
 .DS_Store

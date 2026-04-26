@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 const MODE_CONFIG = [
   { key: 'chat',          label: '一般聊天',     icon: '💬' },
@@ -6,6 +8,31 @@ const MODE_CONFIG = [
   { key: 'skill',         label: '發票辨識',      icon: '🧾' },
   { key: 'function_call', label: '上網找資料',    icon: '🌐' },
 ]
+
+function MessageRefs({ refs }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div className="message-refs">
+      <button className="message-refs-toggle" onClick={() => setExpanded(v => !v)}>
+        <span className="message-refs-label">REF：</span>
+        <span className="message-refs-badges">
+          {refs.map((_, i) => <span key={i} className="message-ref-badge">[{i + 1}]</span>)}
+        </span>
+        <span className={`message-refs-arrow${expanded ? ' message-refs-arrow--open' : ''}`}>▸</span>
+      </button>
+      {expanded && (
+        <div className="message-refs-list">
+          {refs.map((ref, i) => (
+            <div key={ref.id} className="message-ref-item">
+              <span className="message-ref-badge">[{i + 1}]</span>
+              <span className="message-ref-text">{ref.question}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function ChatPanel({ messages, onSendMessage, active, isTyping, onUpdateRouterMode, onConfirmRoute }) {
   const [input, setInput] = useState('')
@@ -126,8 +153,13 @@ export default function ChatPanel({ messages, onSendMessage, active, isTyping, o
                         alt="uploaded"
                       />
                     )}
-                    {msg.text && <p>{msg.text}</p>}
+                    {msg.text && (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} className="md">
+                        {msg.text}
+                      </ReactMarkdown>
+                    )}
                   </div>
+                  {msg.refs && msg.refs.length > 0 && <MessageRefs refs={msg.refs} />}
                 </div>
               )
             })}
