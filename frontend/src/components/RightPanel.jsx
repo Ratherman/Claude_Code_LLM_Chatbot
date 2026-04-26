@@ -12,9 +12,7 @@ const FEATURE_TOGGLES = [
   { key: 'functionCallEnabled', label: 'Function Call 上網查詢' },
 ]
 
-const DISABLED_TOGGLES = [
-  { key: 'tokenLog', label: 'Token 與模型記錄' },
-]
+const DISABLED_TOGGLES = []
 
 export default function RightPanel({
   collapsed, onToggleCollapse,
@@ -167,16 +165,21 @@ export default function RightPanel({
 
         <div className="setting-divider" />
 
-        {/* Still disabled */}
-        {DISABLED_TOGGLES.map(t => (
-          <div key={t.key} className="setting-toggle setting-toggle--dim">
-            <span className="toggle-label">{t.label}</span>
-            <label className="toggle-switch">
-              <input type="checkbox" disabled />
-              <span className="toggle-track"><span className="toggle-thumb" /></span>
-            </label>
+        {/* Token logging — independent */}
+        <div className="setting-toggle">
+          <div className="toggle-label-group">
+            <span className="toggle-label">Token 與模型記錄</span>
+            <span className="toggle-sublabel">記錄每次對話的 Token 用量與模型</span>
           </div>
-        ))}
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={!!settings?.tokenLog}
+              onChange={e => onToggleChange('tokenLog', e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
+        </div>
 
       </div>
     </aside>

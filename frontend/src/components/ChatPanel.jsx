@@ -9,6 +9,64 @@ const MODE_CONFIG = [
   { key: 'function_call', label: '上網找資料',    icon: '🌐' },
 ]
 
+const STAGE_LABEL = {
+  router:        'Router',
+  embed:         'Embed',
+  rag:           'RAG',
+  skill:         'Skill',
+  function_call: 'Func',
+  chat:          'Chat',
+  input_check:   'Guard-in',
+  output_check:  'Guard-out',
+}
+
+function TokenBar({ stats }) {
+  const [expanded, setExpanded] = useState(false)
+  if (!stats || stats.length === 0) return null
+
+  const totals = stats.reduce(
+    (acc, s) => ({ input: acc.input + s.input_tokens, output: acc.output + s.output_tokens }),
+    { input: 0, output: 0 }
+  )
+
+  const byModel = {}
+  for (const s of stats) {
+    if (!byModel[s.model]) byModel[s.model] = { input: 0, output: 0 }
+    byModel[s.model].input  += s.input_tokens
+    byModel[s.model].output += s.output_tokens
+  }
+
+  return (
+    <div className="token-bar">
+      <button className="token-bar-toggle" onClick={() => setExpanded(v => !v)}>
+        <span className="token-bar-summary">
+          ▸ Token 用量　輸入 <strong>{totals.input.toLocaleString()}</strong>　輸出 <strong>{totals.output.toLocaleString()}</strong>
+        </span>
+        <span className={`token-bar-arrow${expanded ? ' token-bar-arrow--open' : ''}`}>▾</span>
+      </button>
+      {expanded && (
+        <div className="token-bar-detail">
+          <div className="token-bar-models">
+            {Object.entries(byModel).map(([m, v]) => (
+              <div key={m} className="token-bar-model-row">
+                <span className="token-bar-model-name">{m}</span>
+                <span className="token-bar-model-nums">↑{v.input.toLocaleString()} ↓{v.output.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+          <div className="token-bar-stages">
+            {stats.map((s, i) => (
+              <span key={i} className="token-bar-stage-chip">
+                {STAGE_LABEL[s.stage] ?? s.stage} {s.input_tokens}+{s.output_tokens}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MessageRefs({ refs }) {
   const [expanded, setExpanded] = useState(false)
   return (
@@ -40,7 +98,7 @@ function MessageRefs({ refs }) {
   )
 }
 
-export default function ChatPanel({ messages, onSendMessage, active, isTyping, onUpdateRouterMode, onConfirmRoute }) {
+export default function ChatPanel({ messages, onSendMessage, active, isTyping, onUpdateRouterMode, onConfirmRoute, tokenStats }) {
   const [input, setInput] = useState('')
   const [pendingImage, setPendingImage] = useState(null)
   const [lightboxSrc, setLightboxSrc] = useState(null)
@@ -84,6 +142,7 @@ export default function ChatPanel({ messages, onSendMessage, active, isTyping, o
 
   return (
     <main className="chat-panel">
+      <TokenBar stats={tokenStats} />
       <div className="messages-area">
         {!active ? (
           <div className="empty-state">

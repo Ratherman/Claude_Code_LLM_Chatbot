@@ -100,15 +100,15 @@ _load_guardrails()
 def _guardrails_check(text, check_type):
     """
     check_type: 'input_check' | 'output_check'
-    Returns (safe: bool, blocked_message: str | None)
+    Returns (safe: bool, blocked_message: str | None, usage: dict | None)
     """
     if not client or not _guardrails:
-        return True, None
+        return True, None, None
     cfg = _guardrails.get(check_type, {})
     template = cfg.get('prompt', '')
     blocked_msg = cfg.get('blocked_response', '內容未通過安全檢查。')
     if not template:
-        return True, None
+        return True, None, None
     key = 'user_input' if check_type == 'input_check' else 'bot_response'
     prompt = template.replace(f'{{{key}}}', text)
     try:
@@ -118,12 +118,18 @@ def _guardrails_check(text, check_type):
             temperature=0,
             max_tokens=5,
         )
+        usage = {
+            'stage': check_type,
+            'model': 'gpt-4o-mini',
+            'input_tokens': result.usage.prompt_tokens,
+            'output_tokens': result.usage.completion_tokens,
+        }
         answer = result.choices[0].message.content.strip().lower()
         if answer.startswith('yes'):
-            return True, None
-        return False, blocked_msg.strip()
+            return True, None, usage
+        return False, blocked_msg.strip(), usage
     except Exception:
-        return True, None  # 檢查失敗時放行，避免誤擋
+        return True, None, None  # 檢查失敗時放行，避免誤擋
 
 
 # ── RAG: load QA data and embeddings on startup ────────────────────────────────
@@ -217,7 +223,13 @@ def route():
         )
         raw = response.choices[0].message.content
         result = RouteResult(**json.loads(raw))
-        return jsonify({'mode': result.mode, 'reason': result.reason})
+        usage = {
+            'stage': 'router',
+            'model': 'gpt-4o-mini',
+            'input_tokens': response.usage.prompt_tokens,
+            'output_tokens': response.usage.completion_tokens,
+        }
+        return jsonify({'mode': result.mode, 'reason': result.reason, 'usage': usage})
     except Exception:
         return jsonify({'mode': 'chat', 'reason': '分流判斷失敗，預設一般聊天模式'}), 200
 
@@ -236,14 +248,38 @@ def chat():
     mode = data.get('mode', 'chat')
     guardrail_on = data.get('guardrail', False)
 
+    usage_log = []
+
+    def _log(stage, resp):
+        usage_log.append({
+            'stage': stage,
+            'model': model,
+            'input_tokens': resp.usage.prompt_tokens,
+            'output_tokens': resp.usage.completion_tokens,
+        })
+
+    def _log_embed(resp):
+        usage_log.append({
+            'stage': 'embed',
+            'model': 'text-embedding-3-small',
+            'input_tokens': resp.usage.prompt_tokens,
+            'output_tokens': 0,
+        })
+
+    def _guarded(text, check_type):
+        safe, blocked_msg, u = _guardrails_check(text, check_type)
+        if u:
+            usage_log.append(u)
+        return safe, blocked_msg
+
     # ── Input Guard ───────────────────────────────────────────────────────────
     if guardrail_on:
         user_msgs = [m for m in messages if m.get('role') == 'user']
         if user_msgs:
             last_input = user_msgs[-1].get('text', '')
-            safe, blocked_msg = _guardrails_check(last_input, 'input_check')
+            safe, blocked_msg = _guarded(last_input, 'input_check')
             if not safe:
-                return jsonify({'text': blocked_msg, 'guardrail_blocked': 'input'})
+                return jsonify({'text': blocked_msg, 'guardrail_blocked': 'input', 'usage': usage_log})
 
     # ── RAG mode ──────────────────────────────────────────────────────────────
     if mode == 'rag':
@@ -260,6 +296,7 @@ def chat():
                 model='text-embedding-3-small',
                 input=query_text,
             )
+            _log_embed(emb_response)
             query_embedding = emb_response.data[0].embedding
             relevant_qas = _rag_search(query_embedding, top_k=3)
             context = '\n\n'.join(
@@ -280,13 +317,14 @@ def chat():
                 messages=api_messages,
                 temperature=temperature,
             )
+            _log('rag', response)
             refs = [{'id': qa['id'], 'question': qa['question']} for qa in relevant_qas]
             text = response.choices[0].message.content
             if guardrail_on:
-                safe, blocked_msg = _guardrails_check(text, 'output_check')
+                safe, blocked_msg = _guarded(text, 'output_check')
                 if not safe:
-                    return jsonify({'text': blocked_msg, 'guardrail_blocked': 'output'})
-            return jsonify({'text': text, 'refs': refs})
+                    return jsonify({'text': blocked_msg, 'guardrail_blocked': 'output', 'usage': usage_log})
+            return jsonify({'text': text, 'refs': refs, 'usage': usage_log})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
@@ -303,12 +341,13 @@ def chat():
                 messages=api_messages,
                 temperature=temperature,
             )
+            _log('skill', response)
             text = response.choices[0].message.content
             if guardrail_on:
-                safe, blocked_msg = _guardrails_check(text, 'output_check')
+                safe, blocked_msg = _guarded(text, 'output_check')
                 if not safe:
-                    return jsonify({'text': blocked_msg, 'guardrail_blocked': 'output'})
-            return jsonify({'text': text})
+                    return jsonify({'text': blocked_msg, 'guardrail_blocked': 'output', 'usage': usage_log})
+            return jsonify({'text': text, 'usage': usage_log})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
@@ -340,13 +379,14 @@ def chat():
                 messages=api_messages,
                 temperature=temperature,
             )
+            _log('function_call', response)
             text = response.choices[0].message.content
             refs = [{'title': r['title'], 'url': r['url']} for r in results]
             if guardrail_on:
-                safe, blocked_msg = _guardrails_check(text, 'output_check')
+                safe, blocked_msg = _guarded(text, 'output_check')
                 if not safe:
-                    return jsonify({'text': blocked_msg, 'guardrail_blocked': 'output'})
-            return jsonify({'text': text, 'refs': refs})
+                    return jsonify({'text': blocked_msg, 'guardrail_blocked': 'output', 'usage': usage_log})
+            return jsonify({'text': text, 'refs': refs, 'usage': usage_log})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
@@ -362,12 +402,13 @@ def chat():
             messages=api_messages,
             temperature=temperature,
         )
+        _log('chat', response)
         text = response.choices[0].message.content
         if guardrail_on:
-            safe, blocked_msg = _guardrails_check(text, 'output_check')
+            safe, blocked_msg = _guarded(text, 'output_check')
             if not safe:
-                return jsonify({'text': blocked_msg, 'guardrail_blocked': 'output'})
-        return jsonify({'text': text})
+                return jsonify({'text': blocked_msg, 'guardrail_blocked': 'output', 'usage': usage_log})
+        return jsonify({'text': text, 'usage': usage_log})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -1220,3 +1220,59 @@
   border-top: 1px solid var(--border-lt);
   margin: 0.8em 0;
 }
+
+/* ── Token Bar ─────────────────────────────────────────────────────────────── */
+.token-bar {
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+.token-bar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.35rem 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+.token-bar-toggle:hover { background: rgba(255,255,255,0.04); }
+.token-bar-summary { flex: 1; }
+.token-bar-summary strong { color: var(--gold-lt); }
+.token-bar-arrow { transition: transform 0.2s; font-size: 0.8rem; }
+.token-bar-arrow--open { transform: rotate(180deg); }
+.token-bar-detail {
+  padding: 0.4rem 1rem 0.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.token-bar-models { display: flex; flex-direction: column; gap: 0.2rem; }
+.token-bar-model-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.token-bar-model-name { color: var(--text-dim); }
+.token-bar-model-nums { color: var(--gold-lt); font-variant-numeric: tabular-nums; }
+.token-bar-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding-top: 0.2rem;
+  border-top: 1px solid var(--border);
+}
+.token-bar-stage-chip {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}

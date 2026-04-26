@@ -13,6 +13,7 @@ const FEATURE_LABELS = {
   skillEnabled:        'SKILL 技能加載',
   functionCallEnabled: 'Function Call 上網查詢',
   guardrail:           'NeMo Guardrail 安全防護',
+  tokenLog:            'Token 與模型記錄',
 }
 
 const FEATURE_REQUIRED = {
@@ -43,11 +44,18 @@ export default function App() {
     skillEnabled: false,
     functionCallEnabled: false,
     guardrail: false,
+    tokenLog: false,
   })
+  const [tokenStats, setTokenStats] = useState({ 1: [] })
   const [toasts, setToasts] = useState([])
   const [retryCount, setRetryCount] = useState(0)
   const nextId = useRef(2)
   const pendingHistoryRef = useRef({})
+
+  const addTokenUsage = (chatId, items) => {
+    if (!items || items.length === 0) return
+    setTokenStats(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), ...items] }))
+  }
 
   useEffect(() => {
     setApiStatus('checking')
@@ -74,6 +82,7 @@ export default function App() {
     const id = nextId.current++
     setChats(prev => [...prev, { id, name: '新對話' }])
     setMessages(prev => ({ ...prev, [id]: [] }))
+    setTokenStats(prev => ({ ...prev, [id]: [] }))
     setActiveChatId(id)
   }
 
@@ -82,6 +91,7 @@ export default function App() {
     setChats(remaining)
     setMessages(prev => { const n = { ...prev }; delete n[id]; return n })
     setIsTyping(prev => { const n = { ...prev }; delete n[id]; return n })
+    setTokenStats(prev => { const n = { ...prev }; delete n[id]; return n })
     if (activeChatId === id) setActiveChatId(remaining.length > 0 ? remaining[0].id : null)
   }
 
@@ -103,6 +113,7 @@ export default function App() {
         })
       })
       const data = await res.json()
+      if (settings.tokenLog && data.usage) addTokenUsage(chatId, data.usage)
       const reply = {
         id: Date.now(), role: 'assistant',
         text: data.error ? `錯誤：${data.error}` : data.text,
@@ -168,6 +179,7 @@ export default function App() {
           body: JSON.stringify({ messages: historyToSend.map(m => ({ role: m.role, text: m.text, ...(m.image && { image: m.image }) })) })
         })
         const data = await res.json()
+        if (settings.tokenLog && data.usage) addTokenUsage(chatId, [data.usage])
         if (settings.autoRoute) {
           await _autoConfirm(routerId, data.mode, data.reason, chatId)
         } else {
@@ -311,6 +323,7 @@ export default function App() {
         isTyping={!!isTyping[activeChatId]}
         onUpdateRouterMode={updateRouterMode}
         onConfirmRoute={confirmRoute}
+        tokenStats={activeChatId ? (tokenStats[activeChatId] || []) : []}
       />
       <RightPanel
         collapsed={rightCollapsed}
