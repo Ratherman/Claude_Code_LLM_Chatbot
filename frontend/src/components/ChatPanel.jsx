@@ -23,9 +23,15 @@ function MessageRefs({ refs }) {
       {expanded && (
         <div className="message-refs-list">
           {refs.map((ref, i) => (
-            <div key={ref.id} className="message-ref-item">
+            <div key={i} className="message-ref-item">
               <span className="message-ref-badge">[{i + 1}]</span>
-              <span className="message-ref-text">{ref.question}</span>
+              {ref.url ? (
+                <a href={ref.url} target="_blank" rel="noreferrer" className="message-ref-link">
+                  {ref.title || ref.url}
+                </a>
+              ) : (
+                <span className="message-ref-text">{ref.question}</span>
+              )}
             </div>
           ))}
         </div>

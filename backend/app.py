@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
+from tavily import TavilyClient
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import Literal
@@ -17,6 +18,9 @@ CORS(app)
 
 api_key = os.getenv('OPENAI_API_KEY')
 client = OpenAI(api_key=api_key) if api_key else None
+
+tavily_key = os.getenv('TAVILY_API_KEY')
+tavily_client = TavilyClient(api_key=tavily_key) if tavily_key else None
 
 _BASE = pathlib.Path(__file__).parent
 
@@ -243,9 +247,38 @@ def chat():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-    # ── Placeholder for unimplemented modes ────────────────────────────────────
+    # ── Function Call mode: Tavily search + LLM summarise ─────────────────────
     if mode == 'function_call':
-        return jsonify({'text': '（Function Call）上網找資料功能尚未實踐，敬請期待。'})
+        if not tavily_client:
+            return jsonify({'text': '（Function Call）未設定 TAVILY_API_KEY，請在 .env 中加入 TAVILY_API_KEY=tvly-...'})
+
+        user_messages = [m for m in messages if m.get('role') == 'user']
+        query_text = user_messages[-1].get('text', '') if user_messages else ''
+        if not query_text:
+            return jsonify({'text': '未收到搜尋關鍵字'})
+
+        try:
+            results = tavily_client.search(query=query_text, max_results=5).get('results', [])
+            context = '\n\n'.join(
+                f"[{i+1}] 標題：{r['title']}\n來源：{r['url']}\n內容：{r['content']}"
+                for i, r in enumerate(results)
+            )
+            fc_system = (
+                "你是一個資訊彙整助手。根據以下即時網路搜尋結果，用繁體中文回答使用者的問題。\n\n"
+                f"搜尋結果：\n{context}\n\n"
+                "回覆時可在適當位置引用來源編號，格式為 [1]、[2]，讓使用者知道資訊出處。"
+            )
+            api_messages = [{'role': 'system', 'content': fc_system}]
+            api_messages.extend([{'role': m['role'], 'content': _build_content(m)} for m in messages])
+            response = client.chat.completions.create(
+                model=model,
+                messages=api_messages,
+                temperature=temperature,
+            )
+            refs = [{'title': r['title'], 'url': r['url']} for r in results]
+            return jsonify({'text': response.choices[0].message.content, 'refs': refs})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
     # ── General chat ──────────────────────────────────────────────────────────
     api_messages = []

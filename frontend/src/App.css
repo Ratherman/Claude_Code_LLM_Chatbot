@@ -1119,6 +1119,15 @@
   color: var(--text-sec);
   line-height: 1.4;
 }
+.message-ref-link {
+  font-size: 11px;
+  color: var(--green-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+.message-ref-link:hover { color: var(--gold-lt); }
 
 /* ── Markdown rendering inside message bubbles ───────────────────────────── */
 .md { line-height: 1.65; }
