@@ -14,9 +14,10 @@ const TOGGLES = [
   { key: 'tokenLog',     label: 'Token 與模型記錄' },
 ]
 
-export default function RightPanel({ collapsed, onToggleCollapse, settings, onModelChange, onTemperatureChange, onSystemPromptSave }) {
+export default function RightPanel({ collapsed, onToggleCollapse, settings, onModelChange, onTemperatureChange, onSystemPromptSave, onMemoryChange }) {
   const [tempValue, setTempValue] = useState(settings?.temperature ?? 1.0)
   const [promptValue, setPromptValue] = useState(settings?.systemPrompt ?? '')
+  const [memoryValue, setMemoryValue] = useState(settings?.memoryCount ?? 5)
 
   if (collapsed) {
     return (
@@ -75,9 +76,17 @@ export default function RightPanel({ collapsed, onToggleCollapse, settings, onMo
         </div>
 
         <div className="setting-group">
-          <label className="setting-label">多輪對話記憶數量</label>
-          <input type="number" className="setting-number" min="1" max="20" defaultValue={10} disabled />
-          <span className="setting-soon">即將開放</span>
+          <div className="setting-row">
+            <label className="setting-label">對話記憶輪數</label>
+            <span className="setting-value">{memoryValue}</span>
+          </div>
+          <input
+            type="range" min="1" max="10" step="1"
+            value={memoryValue}
+            onChange={e => setMemoryValue(parseInt(e.target.value))}
+            onPointerUp={e => onMemoryChange(parseInt(e.target.value))}
+            className="setting-slider"
+          />
         </div>
 
         <div className="setting-divider" />

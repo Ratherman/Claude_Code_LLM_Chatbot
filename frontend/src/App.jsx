@@ -17,7 +17,7 @@ export default function App() {
   const [apiStatus, setApiStatus] = useState('checking')
   const [apiError, setApiError] = useState('')
   const [maskedKey, setMaskedKey] = useState('')
-  const [settings, setSettings] = useState({ model: 'gpt-4o', temperature: 1.0, systemPrompt: '' })
+  const [settings, setSettings] = useState({ model: 'gpt-4o', temperature: 1.0, systemPrompt: '', memoryCount: 5 })
   const [toasts, setToasts] = useState([])
   const [retryCount, setRetryCount] = useState(0)
   const nextId = useRef(2)
@@ -75,12 +75,18 @@ export default function App() {
 
     setIsTyping(prev => ({ ...prev, [activeChatId]: true }))
 
+    const prevHistory = messages[activeChatId] || []
+    const recentPrev = settings.memoryCount > 0
+      ? prevHistory.slice(-(settings.memoryCount * 2))
+      : []
+    const historyToSend = [...recentPrev, userMsg]
+
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [{ role: userMsg.role, text: userMsg.text, ...(userMsg.image && { image: userMsg.image }) }],
+          messages: historyToSend.map(m => ({ role: m.role, text: m.text, ...(m.image && { image: m.image }) })),
           model: settings.model,
           temperature: settings.temperature,
           systemPrompt: settings.systemPrompt,
@@ -160,6 +166,7 @@ export default function App() {
         onModelChange={model => { setSettings(s => ({ ...s, model })); showToast(`模型已切換為 ${model}`) }}
         onTemperatureChange={temperature => { setSettings(s => ({ ...s, temperature })); showToast(`溫度值已設為 ${temperature.toFixed(1)}`) }}
         onSystemPromptSave={systemPrompt => { setSettings(s => ({ ...s, systemPrompt })); showToast('系統提示詞已儲存') }}
+        onMemoryChange={memoryCount => { setSettings(s => ({ ...s, memoryCount })); showToast(`對話記憶設為 ${memoryCount} 輪`) }}
       />
       <div className="toast-container">
         {toasts.map(t => <div key={t.id} className="toast">{t.msg}</div>)}
