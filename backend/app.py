@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import Literal
 import pathlib
 import os
+import re
 import json
 import numpy as np
 
@@ -26,17 +27,54 @@ class RouteResult(BaseModel):
     reason: str
 
 
-ROUTER_SYSTEM_PROMPT = """你是一個智慧對話分流器。根據對話脈絡判斷最後一則使用者訊息應由哪個模式處理。
+# ── Skills: load all .md files under backend/skills/ ──────────────────────────
+SKILLS = {}
+
+
+def _load_skills():
+    global SKILLS
+    skills_dir = _BASE / 'skills'
+    if not skills_dir.exists():
+        return
+    for path in sorted(skills_dir.glob('*.md')):
+        content = path.read_text(encoding='utf-8')
+        m = re.match(r'^---\s*\n(.*?)\n---\s*\n(.*)', content, re.DOTALL)
+        if m:
+            fm_text, instructions = m.group(1), m.group(2).strip()
+        else:
+            fm_text, instructions = '', content
+        fm = {}
+        for line in fm_text.splitlines():
+            if ':' in line:
+                k, _, v = line.partition(':')
+                fm[k.strip()] = v.strip()
+        SKILLS[path.stem] = {
+            'name': fm.get('name', path.stem),
+            'description': fm.get('description', ''),
+            'instructions': instructions,
+        }
+
+
+_load_skills()
+
+
+def _skill_summary():
+    if not SKILLS:
+        return '發票辨識，例如：使用者上傳發票圖片、要求讀取或解析發票、統編查詢'
+    return '、'.join(f"【{s['name']}】{s['description']}" for s in SKILLS.values())
+
+
+ROUTER_SYSTEM_PROMPT = f"""你是一個智慧對話分流器。根據對話脈絡判斷最後一則使用者訊息應由哪個模式處理。
 回覆必須是純 JSON，不得包含任何 markdown 或多餘文字。
 
 ## 四種模式定義
 - chat        : 一般聊天、問候、閒聊、通用知識問答、不屬於其他三類的問題
 - rag         : MIS／IT 支援相關問題，例如：忘記密碼（Windows/Email/ERP/VPN）、電腦開不起來或速度慢、藍色死亡畫面（BSOD）、程式當機、螢幕閃爍或顯示異常、雙螢幕設定、Gmail 收發信件或附件問題、網路無法連線、Wi-Fi 問題、印表機無法列印、軟體安裝申請、資料誤刪救援等 IT 支援問題
-- skill       : 發票辨識，例如：使用者上傳發票圖片、要求讀取或解析發票、統編查詢
+- skill       : {_skill_summary()}
 - function_call: 需要即時網路資料，例如：今日天氣、最新新聞、即時股價、近期發生的事件
 
 ## 輸出格式（嚴格遵守，只輸出此 JSON）
-{"mode": "<chat|rag|skill|function_call>", "reason": "<判斷原因，一句話，不超過 30 字>"}"""
+{{"mode": "<chat|rag|skill|function_call>", "reason": "<判斷原因，一句話，不超過 30 字>"}}"""
 
 
 # ── RAG: load QA data and embeddings on startup ────────────────────────────────
@@ -188,13 +226,26 @@ def chat():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-    # ── Placeholder responses for unimplemented pipeline modes ────────────────
-    placeholders = {
-        'skill':         '（Skill）發票辨識功能尚未實踐，敬請期待。',
-        'function_call': '（Function Call）上網找資料功能尚未實踐，敬請期待。',
-    }
-    if mode in placeholders:
-        return jsonify({'text': placeholders[mode]})
+    # ── Skill mode: load full instructions from skills/*.md ───────────────────
+    if mode == 'skill':
+        skill = next(iter(SKILLS.values()), None)
+        if not skill:
+            return jsonify({'text': '（Skill）找不到技能設定檔，請確認 backend/skills/ 目錄下有 .md 檔案。'})
+        api_messages = [{'role': 'system', 'content': skill['instructions']}]
+        api_messages.extend([{'role': m['role'], 'content': _build_content(m)} for m in messages])
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=api_messages,
+                temperature=temperature,
+            )
+            return jsonify({'text': response.choices[0].message.content})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    # ── Placeholder for unimplemented modes ────────────────────────────────────
+    if mode == 'function_call':
+        return jsonify({'text': '（Function Call）上網找資料功能尚未實踐，敬請期待。'})
 
     # ── General chat ──────────────────────────────────────────────────────────
     api_messages = []
