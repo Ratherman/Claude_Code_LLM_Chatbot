@@ -98,7 +98,7 @@ function MessageRefs({ refs }) {
   )
 }
 
-export default function ChatPanel({ messages, onSendMessage, active, isTyping, onUpdateRouterMode, onConfirmRoute, tokenStats }) {
+export default function ChatPanel({ messages, onSendMessage, active, isTyping, onUpdateRouterMode, onConfirmRoute, tokenStats, chatName, onMobileOpenLeft, onMobileOpenRight }) {
   const [input, setInput] = useState('')
   const [pendingImage, setPendingImage] = useState(null)
   const [lightboxSrc, setLightboxSrc] = useState(null)
@@ -142,6 +142,11 @@ export default function ChatPanel({ messages, onSendMessage, active, isTyping, o
 
   return (
     <main className="chat-panel">
+      <div className="mobile-header">
+        <button className="mobile-header-btn" onClick={onMobileOpenLeft} title="對話列表">☰</button>
+        <span className="mobile-header-title">{chatName || 'AI 助手'}</span>
+        <button className="mobile-header-btn" onClick={onMobileOpenRight} title="參數設定">⚙</button>
+      </div>
       <TokenBar stats={tokenStats} />
       <div className="messages-area">
         {!active ? (
@@ -209,20 +214,25 @@ export default function ChatPanel({ messages, onSendMessage, active, isTyping, o
 
               return (
                 <div key={msg.id} className={`message message--${msg.role}`}>
-                  <div className="message-bubble">
-                    {msg.image && (
-                      <img
-                        src={msg.image}
-                        className="message-img"
-                        onClick={() => setLightboxSrc(msg.image)}
-                        alt="uploaded"
-                      />
-                    )}
-                    {msg.text && (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} className="md">
-                        {msg.text}
-                      </ReactMarkdown>
-                    )}
+                  <div className="message-content">
+                    <span className="message-role-label">
+                      {msg.role === 'user' ? '你' : 'AI'}
+                    </span>
+                    <div className="message-bubble">
+                      {msg.image && (
+                        <img
+                          src={msg.image}
+                          className="message-img"
+                          onClick={() => setLightboxSrc(msg.image)}
+                          alt="uploaded"
+                        />
+                      )}
+                      {msg.text && (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} className="md">
+                          {msg.text}
+                        </ReactMarkdown>
+                      )}
+                    </div>
                   </div>
                   {msg.refs && msg.refs.length > 0 && <MessageRefs refs={msg.refs} />}
                 </div>
@@ -271,7 +281,7 @@ export default function ChatPanel({ messages, onSendMessage, active, isTyping, o
             value={input}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder={active ? '輸入訊息… Enter 送出 ／ Shift+Enter 換行' : '請先選擇或新增對話'}
+            placeholder={active ? '輸入訊息…' : '請先選擇對話'}
             disabled={!active}
             rows={1}
           />

@@ -47,6 +47,8 @@ export default function App() {
     tokenLog: false,
   })
   const [tokenStats, setTokenStats] = useState({ 1: [] })
+  const [mobileLeftOpen, setMobileLeftOpen] = useState(false)
+  const [mobileRightOpen, setMobileRightOpen] = useState(false)
   const [toasts, setToasts] = useState([])
   const [retryCount, setRetryCount] = useState(0)
   const nextId = useRef(2)
@@ -302,12 +304,18 @@ export default function App() {
     )
   }
 
+  const activeChatName = chats.find(c => c.id === activeChatId)?.name || ''
+  const closeMobileDrawers = () => { setMobileLeftOpen(false); setMobileRightOpen(false) }
+
   return (
     <div className="app-layout" data-theme={theme}>
+      {(mobileLeftOpen || mobileRightOpen) && (
+        <div className="mobile-backdrop" onClick={closeMobileDrawers} />
+      )}
       <LeftPanel
         chats={chats}
         activeChatId={activeChatId}
-        onSelectChat={setActiveChatId}
+        onSelectChat={id => { setActiveChatId(id); setMobileLeftOpen(false) }}
         onAddChat={addChat}
         onDeleteChat={deleteChat}
         onRenameChat={renameChat}
@@ -315,6 +323,8 @@ export default function App() {
         onToggleCollapse={() => setLeftCollapsed(v => !v)}
         theme={theme}
         onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+        mobileOpen={mobileLeftOpen}
+        onMobileClose={() => setMobileLeftOpen(false)}
       />
       <ChatPanel
         messages={activeChatId ? (messages[activeChatId] || []) : []}
@@ -324,10 +334,15 @@ export default function App() {
         onUpdateRouterMode={updateRouterMode}
         onConfirmRoute={confirmRoute}
         tokenStats={activeChatId ? (tokenStats[activeChatId] || []) : []}
+        chatName={activeChatName}
+        onMobileOpenLeft={() => setMobileLeftOpen(true)}
+        onMobileOpenRight={() => setMobileRightOpen(true)}
       />
       <RightPanel
         collapsed={rightCollapsed}
         onToggleCollapse={() => setRightCollapsed(v => !v)}
+        mobileOpen={mobileRightOpen}
+        onMobileClose={() => setMobileRightOpen(false)}
         settings={settings}
         onModelChange={model => { setSettings(s => ({ ...s, model })); showToast(`模型已切換為 ${model}`) }}
         onTemperatureChange={temperature => { setSettings(s => ({ ...s, temperature })); showToast(`溫度值已設為 ${temperature.toFixed(1)}`) }}

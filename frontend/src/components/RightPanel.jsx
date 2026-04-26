@@ -16,13 +16,14 @@ const DISABLED_TOGGLES = []
 
 export default function RightPanel({
   collapsed, onToggleCollapse,
-  settings, onModelChange, onTemperatureChange, onSystemPromptSave, onMemoryChange, onToggleChange
+  settings, onModelChange, onTemperatureChange, onSystemPromptSave, onMemoryChange, onToggleChange,
+  mobileOpen, onMobileClose
 }) {
   const [tempValue, setTempValue] = useState(settings?.temperature ?? 1.0)
   const [promptValue, setPromptValue] = useState(settings?.systemPrompt ?? '')
   const [memoryValue, setMemoryValue] = useState(settings?.memoryCount ?? 5)
 
-  if (collapsed) {
+  if (collapsed && !mobileOpen) {
     return (
       <aside className="right-panel right-panel--collapsed">
         <button className="collapse-toggle" onClick={onToggleCollapse} title="展開設定欄">‹</button>
@@ -33,7 +34,7 @@ export default function RightPanel({
   const routerOn = !!settings?.contextRouter
 
   return (
-    <aside className="right-panel">
+    <aside className={`right-panel${mobileOpen ? ' right-panel--mobile-open' : ''}`}>
       <div className="panel-header">
         <span className="panel-title">參數設定</span>
         <button className="collapse-toggle" onClick={onToggleCollapse} title="收起設定欄">›</button>

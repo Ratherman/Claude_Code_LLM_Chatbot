@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 
 export default function LeftPanel({
   chats, activeChatId, onSelectChat, onAddChat, onDeleteChat, onRenameChat,
-  collapsed, onToggleCollapse, theme, onToggleTheme
+  collapsed, onToggleCollapse, theme, onToggleTheme,
+  mobileOpen, onMobileClose
 }) {
   const [openMenuId, setOpenMenuId] = useState(null)
   const [editingId, setEditingId] = useState(null)
@@ -27,7 +28,7 @@ export default function LeftPanel({
     setEditingId(null)
   }
 
-  if (collapsed) {
+  if (collapsed && !mobileOpen) {
     return (
       <aside className="left-panel left-panel--collapsed">
         <button className="collapse-toggle" onClick={onToggleCollapse} title="展開側邊欄">›</button>
@@ -43,7 +44,7 @@ export default function LeftPanel({
   }
 
   return (
-    <aside className="left-panel">
+    <aside className={`left-panel${mobileOpen ? ' left-panel--mobile-open' : ''}`}>
       <div className="panel-header">
         <span className="panel-title">對話記錄</span>
         <button className="btn-icon" onClick={onAddChat} title="新增對話">＋</button>
