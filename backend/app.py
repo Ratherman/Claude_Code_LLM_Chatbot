@@ -46,10 +46,21 @@ def chat():
     temperature = float(data.get('temperature', 1.0))
     system_prompt = data.get('systemPrompt', '').strip()
 
+    def build_content(msg):
+        text = msg.get('text', '')
+        image = msg.get('image', '')
+        if image:
+            content = []
+            if text:
+                content.append({'type': 'text', 'text': text})
+            content.append({'type': 'image_url', 'image_url': {'url': image}})
+            return content
+        return text
+
     api_messages = []
     if system_prompt:
         api_messages.append({'role': 'system', 'content': system_prompt})
-    api_messages.extend([{'role': m['role'], 'content': m['text']} for m in messages])
+    api_messages.extend([{'role': m['role'], 'content': build_content(m)} for m in messages])
 
     try:
         response = client.chat.completions.create(

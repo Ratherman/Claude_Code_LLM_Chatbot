@@ -448,16 +448,61 @@
   border-radius: var(--r);
   background: var(--bg-elevated);
   border: 1px solid var(--border-lt);
-  cursor: not-allowed;
-  opacity: .35;
+  cursor: pointer;
   color: var(--text-sec);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), border-color var(--transition);
+}
+.btn-upload:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--green);
+}
+.btn-upload:disabled { opacity: .35; cursor: not-allowed; }
+
+.input-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Image preview in input area */
+.image-preview-wrap {
+  position: relative;
+  display: inline-flex;
+  align-self: flex-start;
+}
+.image-preview {
+  height: 64px;
+  width: auto;
+  max-width: 130px;
+  border-radius: var(--r);
+  border: 1px solid var(--border-lt);
+  object-fit: cover;
+}
+.image-preview-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .chat-input {
-  flex: 1;
+  width: 100%;
   min-height: 36px;
   max-height: 150px;
   background: var(--bg-input);
@@ -811,3 +856,60 @@
   white-space: nowrap;
   font-family: var(--font);
 }
+
+/* ============================================================
+   Image in message bubble
+   ============================================================ */
+.message-img {
+  display: block;
+  max-width: 280px;
+  max-height: 280px;
+  width: auto;
+  height: auto;
+  border-radius: calc(var(--r-bubble) - 4px);
+  object-fit: cover;
+  cursor: zoom-in;
+  margin-bottom: 4px;
+}
+.message-img:last-child { margin-bottom: 0; }
+
+/* ============================================================
+   Lightbox
+   ============================================================ */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+  cursor: zoom-out;
+}
+.lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: var(--r);
+  cursor: default;
+  box-shadow: var(--shadow-md);
+}
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.22);
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition);
+}
+.lightbox-close:hover { background: rgba(255,255,255,.22); }

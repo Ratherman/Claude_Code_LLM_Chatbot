@@ -60,10 +60,10 @@ export default function App() {
 
   const renameChat = (id, name) => setChats(prev => prev.map(c => c.id === id ? { ...c, name } : c))
 
-  const sendMessage = async (text) => {
+  const sendMessage = async (text, image = null) => {
     if (!activeChatId) return
     const ts = Date.now()
-    const userMsg = { id: ts, role: 'user', text }
+    const userMsg = { id: ts, role: 'user', text, ...(image && { image }) }
 
     setMessages(prev => ({
       ...prev,
@@ -80,7 +80,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [{ role: userMsg.role, text: userMsg.text }],
+          messages: [{ role: userMsg.role, text: userMsg.text, ...(userMsg.image && { image: userMsg.image }) }],
           model: settings.model,
           temperature: settings.temperature,
           systemPrompt: settings.systemPrompt,
